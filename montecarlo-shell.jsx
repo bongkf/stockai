@@ -151,6 +151,7 @@ function buildPercentileBand(paths, days) {
 
 const fmt = (n, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "--");
 const fmtPct = (n) => `${n >= 0 ? "+" : ""}${fmt(n * 100, 1)}%`;
+const todayISO = new Date().toISOString().slice(0, 10);
 
 function normalizeTickerInput(value) {
   const raw = String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
@@ -270,6 +271,7 @@ export default function MainApp() {
   const [inputTicker, setInputTicker] = useState("SHELL.AS");
   const [startPrice, setStartPrice] = useState(29.5);
   const [inputPrice, setInputPrice] = useState("29.50");
+  const [anchorDate, setAnchorDate] = useState("");
   const [isTickerExpanded, setIsTickerExpanded] = useState(false);
 
   const [scenario, setScenario] = useState("base");
@@ -385,8 +387,9 @@ export default function MainApp() {
   }, [inputTicker]);
 
   const loadQuoteForTicker = useCallback(
-    async (symbol) => {
+    async (symbol, options = {}) => {
       const raw = normalizeTickerInput(symbol);
+      const requestedAnchorDate = String(options.anchorDate ?? anchorDate).trim();
       const tickerPattern = /^[A-Z0-9]{1,10}(?:[.-][A-Z0-9]{1,10}){0,2}$/;
       if (!tickerPattern.test(raw)) {
         setQuoteState((prev) => ({
@@ -400,7 +403,8 @@ export default function MainApp() {
       setQuoteState((prev) => ({ ...prev, isLoading: true, error: "" }));
 
       try {
-        const res = await fetch(`/quote/${encodeURIComponent(raw)}`);
+        const query = requestedAnchorDate ? `?date=${encodeURIComponent(requestedAnchorDate)}` : "";
+        const res = await fetch(`/quote/${encodeURIComponent(raw)}${query}`);
         if (!res.ok) throw new Error("Quote lookup failed");
         const quote = await res.json();
 
@@ -428,7 +432,9 @@ export default function MainApp() {
             ? `${sign}${change.toFixed(2)} (${sign}${(Number.isFinite(changePct) ? changePct : 0).toFixed(2)}%)`
             : "--",
           changeClass: change > 0 ? "positive" : change < 0 ? "negative" : "neutral",
-          updatedText: "Updated just now",
+          updatedText: quote?.asof_date
+            ? `Close on ${quote.asof_date}${quote.requested_date && quote.requested_date !== quote.asof_date ? ` (nearest to ${quote.requested_date})` : ""}`
+            : "Updated just now",
           isLoading: false,
           error: "",
         });
@@ -442,7 +448,7 @@ export default function MainApp() {
         }));
       }
     },
-    [runSimulation]
+    [anchorDate, runSimulation]
   );
 
   useEffect(() => {
@@ -478,6 +484,7 @@ export default function MainApp() {
   const runButtonClick = useCallback(() => {
     const manualPrice = Number.parseFloat(inputPrice);
     const normalizedTicker = normalizeTickerInput(inputTicker);
+    const normalizedAnchorDate = String(anchorDate || "").trim();
 
     if (normalizedTicker) {
       setTicker(normalizedTicker);
@@ -493,9 +500,9 @@ export default function MainApp() {
 
     if (quoteDebounceRef.current) clearTimeout(quoteDebounceRef.current);
     quoteDebounceRef.current = window.setTimeout(() => {
-      loadQuoteForTicker(normalizedTicker || ticker);
+      loadQuoteForTicker(normalizedTicker || ticker, { anchorDate: normalizedAnchorDate });
     }, 200);
-  }, [inputPrice, inputTicker, loadQuoteForTicker, runSimulation, ticker]);
+  }, [anchorDate, inputPrice, inputTicker, loadQuoteForTicker, runSimulation, ticker]);
 
   const pathData = useMemo(() => {
     if (!results) return [];
@@ -652,17 +659,19 @@ export default function MainApp() {
           text-transform: uppercase;
           letter-spacing: 0.06em;
         }
-        .ticker-group { grid-column: span 4; }
+        .ticker-group { grid-column: span 3; }
         .price-group { grid-column: span 2; }
+        .anchor-date-group { grid-column: span 2; }
         .horizon-group { grid-column: span 2; }
         .paths-group { grid-column: span 2; }
-        .action-group { grid-column: span 2; }
+        .action-group { grid-column: span 1; }
 
         .search-box.compact .price-group,
+        .search-box.compact .anchor-date-group,
         .search-box.compact .horizon-group,
         .search-box.compact .paths-group,
         .search-box.compact .action-group {
-          grid-column: span 3;
+          grid-column: span 2;
         }
 
         .input-field {
@@ -933,7 +942,9 @@ export default function MainApp() {
           .ticker-group, .price-group, .horizon-group, .paths-group, .action-group {
             grid-column: span 1;
           }
+          .anchor-date-group { grid-column: span 1; }
           .search-box.compact .price-group,
+          .search-box.compact .anchor-date-group,
           .search-box.compact .horizon-group,
           .search-box.compact .paths-group,
           .search-box.compact .action-group {
@@ -1064,7 +1075,7 @@ export default function MainApp() {
           ) : null}
 
           <div className="input-group price-group">
-            <label>Current Price</label>
+            <label>Share Price</label>
             <input
               className="input-field"
               type="number"
@@ -1077,6 +1088,17 @@ export default function MainApp() {
                 }
               }}
               placeholder="29.50"
+            />
+          </div>
+
+          <div className="input-group anchor-date-group">
+            <label>Anchor Date</label>
+            <input
+              className="input-field"
+              type="date"
+              max={todayISO}
+              value={anchorDate}
+              onChange={(event) => setAnchorDate(event.target.value)}
             />
           </div>
 
