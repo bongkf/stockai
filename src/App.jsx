@@ -1,38 +1,27 @@
-import React, { useState } from "react";
-import MonteCarlo from "../montecarlo-shell.jsx";
-import ShellRD from "../shell-rd-covered-calls.jsx";
-import Home from "./Home.jsx";
+import React from "react";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import MonteCarlo from "./components/MonteCarlo.jsx";
+import ShellRD from "./components/ShellRD.jsx";
+import Home from "./components/Home.jsx";
 
 export default function App() {
-	const [view, setView] = useState("home");
+  return (
+    <BrowserRouter>
+      <div className="app-root">
+        <header className="app-header">
+          <nav>
+            <Link to="/" className="home-link">Home</Link>
+          </nav>
+        </header>
 
-	return (
-		<div style={{ minHeight: "100vh", fontFamily: "Inter, system-ui, sans-serif" }}>
-			{view === "home" ? (
-				<Home onSelect={(v) => setView(v)} />
-			) : (
-				<div>
-					<div style={{ padding: 12 }}>
-						<button
-							onClick={() => setView("home")}
-							style={{
-								padding: "8px 12px",
-								borderRadius: 6,
-								border: "1px solid #ddd",
-								background: "#fff",
-								cursor: "pointer",
-							}}
-						>
-							← Home
-						</button>
-					</div>
-
-					<div>
-						{view === "montecarlo" && <MonteCarlo />}
-						{view === "shellrd" && <ShellRD />}
-					</div>
-				</div>
-			)}
-		</div>
-	);
+        <main>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/montecarlo" element={<MonteCarlo />} />
+            <Route path="/shellrd" element={<ShellRD />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  );
 }
