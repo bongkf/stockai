@@ -1,7 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useOptPilotAuth } from "../context/OptPilotAuthContext.jsx";
 
 export default function Home() {
+  const { ready, user, selectedUserKey, openDialog, logout, busy, authError } = useOptPilotAuth();
+
   return (
     <div className="home-container">
       <div className="home-inner">
@@ -10,9 +13,29 @@ export default function Home() {
           <p className="home-sub">Choose a dashboard to start.</p>
         </header>
 
+        <section className="home-auth-card">
+          <div>
+            <div className="home-auth-title">OptPilot Access</div>
+            <div className="home-auth-sub">
+              {ready ? (user ? `Signed in as ${user.displayName || user.email || user.uid} (${selectedUserKey})` : "Not signed in") : "Loading auth runtime..."}
+            </div>
+            {authError ? <div className="home-auth-error">{authError}</div> : null}
+          </div>
+
+          <div className="home-auth-actions">
+            <button type="button" className="card-btn primary" onClick={openDialog} disabled={!ready || busy}>
+              {user ? "Manage Login" : "Login / Logout"}
+            </button>
+            <button type="button" className="card-btn" onClick={logout} disabled={!user || busy}>
+              Logout
+            </button>
+          </div>
+        </section>
+
         <div className="home-actions">
           <Link to="/montecarlo" className="card-btn">Monte Carlo Simulator</Link>
           <Link to="/shellrd" className="card-btn">RD Covered Calls</Link>
+          <Link to="/optpilot" className="card-btn">OptPilot Weekly Options Dashboard</Link>
         </div>
 
         <section className="home-note">

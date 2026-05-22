@@ -1,4 +1,8 @@
-import { defineConfig } from "vite";
+import { readFile } from "node:fs/promises";
+import { defineConfig, loadEnv } from "vite";
+import { getApps as getAdminApps, getApp as getAdminApp, initializeApp as initializeAdminApp, cert } from "firebase-admin/app";
+import { getAuth as getAdminAuth } from "firebase-admin/auth";
+import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import react from "@vitejs/plugin-react";
 
 const YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search";
@@ -16,6 +20,153 @@ function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(payload));
+}
+
+function normalizeUid(value) {
+  return String(value || "").trim();
+}
+
+function envFlag(env, name, fallback = false) {
+  const raw = String(env?.[name] ?? "").trim().toLowerCase();
+  if (!raw) return fallback;
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+}
+
+function firebaseWebConfigFromEnv(env) {
+  const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
+  const authDomain = String(env?.FIREBASE_AUTH_DOMAIN || (projectId ? `${projectId}.firebaseapp.com` : "")).trim();
+  const storageBucket = String(env?.FIREBASE_STORAGE_BUCKET || (projectId ? `${projectId}.appspot.com` : "")).trim();
+  const missingFields = [];
+
+  if (!String(env?.FIREBASE_WEB_API_KEY || "").trim()) missingFields.push("FIREBASE_WEB_API_KEY");
+  if (!projectId) missingFields.push("FIREBASE_PROJECT_ID");
+  if (!authDomain) missingFields.push("FIREBASE_AUTH_DOMAIN");
+
+  return {
+    enabled: envFlag(env, "USE_FIREBASE_AUTH", false),
+    configured: missingFields.length === 0,
+    missingFields,
+    apiKey: String(env?.FIREBASE_WEB_API_KEY || "").trim(),
+    authDomain,
+    projectId,
+    appId: String(env?.FIREBASE_APP_ID || "").trim(),
+    storageBucket,
+    messagingSenderId: String(env?.FIREBASE_MESSAGING_SENDER_ID || "").trim(),
+    authEmulatorHost: String(env?.FIREBASE_AUTH_EMULATOR_HOST || "").trim(),
+  };
+}
+
+const adminState = {
+  ready: false,
+  error: null,
+  app: null,
+  auth: null,
+  firestore: null,
+};
+
+async function loadServiceAccountInfo(env) {
+  const b64 = String(env?.FIREBASE_SERVICE_ACCOUNT_B64 || "").trim();
+  if (b64) {
+    try {
+      return JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+    } catch {
+      return null;
+    }
+  }
+
+  const jsonPath = String(env?.FIREBASE_SERVICE_ACCOUNT_JSON || env?.GOOGLE_APPLICATION_CREDENTIALS || "").trim();
+  if (!jsonPath) return null;
+
+  try {
+    const text = await readFile(jsonPath, "utf8");
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function ensureFirebaseAdmin(runtimeEnv) {
+  if (adminState.ready) return adminState;
+
+  try {
+    if (!envFlag(runtimeEnv, "USE_FIREBASE_AUTH", false)) {
+      adminState.error = "USE_FIREBASE_AUTH is disabled.";
+      return adminState;
+    }
+
+    const serviceAccount = await loadServiceAccountInfo(runtimeEnv);
+    if (!serviceAccount || !serviceAccount.project_id) {
+      adminState.error = "Firebase service account configuration is missing.";
+      return adminState;
+    }
+
+    adminState.app = getAdminApps().length
+      ? getAdminApp()
+      : initializeAdminApp({ credential: cert(serviceAccount) });
+    adminState.auth = getAdminAuth(adminState.app);
+    adminState.firestore = getAdminFirestore(adminState.app);
+    adminState.error = null;
+    return adminState;
+  } catch (error) {
+    adminState.error = error instanceof Error ? error.message : "Failed to initialize Firebase Admin SDK.";
+    return adminState;
+  } finally {
+    adminState.ready = true;
+  }
+}
+
+async function verifyOptpilotRequest(runtimeEnv, req) {
+  const authHeader = String(req.headers.authorization || req.headers.Authorization || "").trim();
+  const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+  if (!token) {
+    throw new Error("Authentication required");
+  }
+
+  const admin = await ensureFirebaseAdmin(runtimeEnv);
+  if (!admin.auth) {
+    throw new Error(admin.error || "Firebase Admin SDK is unavailable.");
+  }
+
+  const decoded = await admin.auth.verifyIdToken(token);
+  const tokenUid = normalizeUid(decoded?.uid);
+  const headerUid = normalizeUid(req.headers["x-optpilot-uid"] || req.headers["x-optpilot-uid".toLowerCase()]);
+  if (headerUid && headerUid !== tokenUid) {
+    throw new Error("Cross-user access is forbidden");
+  }
+
+  return tokenUid;
+}
+
+function firebaseRuntimePayload(env) {
+  const firebase = firebaseWebConfigFromEnv(env);
+  const useFirebase = envFlag(env, "USE_FIREBASE", false);
+  const useFirebaseReads = Object.prototype.hasOwnProperty.call(env, "USE_FIREBASE_READS")
+    ? envFlag(env, "USE_FIREBASE_READS", false)
+    : useFirebase;
+  const useFirebaseWrites = Object.prototype.hasOwnProperty.call(env, "USE_FIREBASE_WRITES")
+    ? envFlag(env, "USE_FIREBASE_WRITES", false)
+    : useFirebase;
+  const useFirebaseShadowReads = envFlag(env, "USE_FIREBASE_SHADOW_READS", false);
+
+  // In Vite dev middleware we only provide client-runtime config; admin init does not run here.
+  const runtimeEnabled = !!firebase.enabled;
+  const firestoreReady = !!(useFirebase && firebase.configured);
+  const adminConfigured = !!String(env?.FIREBASE_SERVICE_ACCOUNT_B64 || env?.FIREBASE_SERVICE_ACCOUNT_JSON || env?.GOOGLE_APPLICATION_CREDENTIALS || "").trim();
+
+  return {
+    firebase,
+    runtimeEnabled,
+    serverRuntimeEnabled: runtimeEnabled && adminConfigured,
+    adminConfigured,
+    adminInitError: adminConfigured ? null : "Firebase service account configuration is missing.",
+    coexistence: {
+      useFirebase,
+      firestoreReady,
+      readsEnabled: !!(useFirebaseReads && firestoreReady),
+      writesEnabled: !!(useFirebaseWrites && firestoreReady),
+      shadowReadsEnabled: !!(useFirebaseShadowReads && firestoreReady),
+    },
+  };
 }
 
 function normalizeTickerInput(input) {
@@ -281,12 +432,68 @@ async function fetchStooqHistoricalQuote(symbol, date) {
   throw new Error("Historical quote unavailable");
 }
 
-function mockApiPlugin() {
+function mockApiPlugin(runtimeEnv) {
   return {
     name: "market-data-api",
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url || "/", "http://localhost");
+
+        if (url.pathname === "/api/firebase/config") {
+          const adminStatus = await ensureFirebaseAdmin(runtimeEnv);
+          const payload = firebaseRuntimePayload(runtimeEnv);
+          payload.serverRuntimeEnabled = !!(payload.runtimeEnabled && adminStatus.auth);
+          payload.adminConfigured = !!adminStatus.auth;
+          payload.adminInitError = adminStatus.error;
+          payload.coexistence.firestoreReady = !!(payload.coexistence.useFirebase && payload.firebase.configured && adminStatus.auth);
+          payload.coexistence.readsEnabled = !!(payload.coexistence.firestoreReady && envFlag(runtimeEnv, "USE_FIREBASE_READS", false));
+          payload.coexistence.writesEnabled = !!(payload.coexistence.firestoreReady && envFlag(runtimeEnv, "USE_FIREBASE_WRITES", false));
+          payload.coexistence.shadowReadsEnabled = !!(payload.coexistence.firestoreReady && envFlag(runtimeEnv, "USE_FIREBASE_SHADOW_READS", false));
+          sendJson(res, 200, payload);
+          return;
+        }
+
+        if (url.pathname === "/api/trades") {
+          try {
+            const uid = await verifyOptpilotRequest(runtimeEnv, req);
+            const admin = await ensureFirebaseAdmin(runtimeEnv);
+            if (!admin.firestore) {
+              sendJson(res, 503, { detail: admin.error || "Firebase Admin SDK is unavailable." });
+              return;
+            }
+
+            const snap = await admin.firestore.collection("portfolios").doc(uid).get();
+            const data = snap.exists ? (snap.data() || {}) : {};
+            const trades = Array.isArray(data.trades) ? data.trades : [];
+            sendJson(res, 200, { uid, trades, source: "firestore", collection: "portfolios" });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Authentication required";
+            const status = message.includes("forbidden") ? 403 : 401;
+            sendJson(res, status, { detail: message });
+          }
+          return;
+        }
+
+        if (url.pathname === "/api/holdings") {
+          try {
+            const uid = await verifyOptpilotRequest(runtimeEnv, req);
+            const admin = await ensureFirebaseAdmin(runtimeEnv);
+            if (!admin.firestore) {
+              sendJson(res, 503, { detail: admin.error || "Firebase Admin SDK is unavailable." });
+              return;
+            }
+
+            const snap = await admin.firestore.collection("portfolios").doc(uid).get();
+            const data = snap.exists ? (snap.data() || {}) : {};
+            const holdings = Array.isArray(data.holdings) ? data.holdings : [];
+            sendJson(res, 200, { uid, holdings, source: "firestore", collection: "portfolios" });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Authentication required";
+            const status = message.includes("forbidden") ? 403 : 401;
+            sendJson(res, status, { detail: message });
+          }
+          return;
+        }
 
         if (url.pathname === "/api/search") {
           const q = normalizeTickerInput(url.searchParams.get("q") || "");
@@ -358,6 +565,11 @@ function mockApiPlugin() {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), mockApiPlugin()]
+export default defineConfig(({ mode }) => {
+  const runtimeEnv = loadEnv(mode, process.cwd(), "");
+
+  return {
+    envPrefix: ["VITE_", "FIREBASE_", "USE_FIREBASE_", "OPTPILOT_"],
+    plugins: [react(), mockApiPlugin(runtimeEnv)]
+  };
 });
