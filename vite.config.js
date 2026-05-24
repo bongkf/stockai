@@ -169,6 +169,31 @@ function firebaseRuntimePayload(env) {
   };
 }
 
+function asTradeRows(value) {
+  if (Array.isArray(value)) {
+    return value.filter((row) => row && typeof row === "object");
+  }
+  if (value && typeof value === "object") {
+    if (Array.isArray(value.trades)) return asTradeRows(value.trades);
+    if (Array.isArray(value.rows)) return asTradeRows(value.rows);
+  }
+  return [];
+}
+
+function extractTradeRows(value) {
+  const direct = asTradeRows(value);
+  if (direct.length) return direct;
+
+  if (value && typeof value === "object") {
+    for (const nested of Object.values(value)) {
+      const nestedRows = asTradeRows(nested);
+      if (nestedRows.length) return nestedRows;
+    }
+  }
+
+  return [];
+}
+
 function normalizeTickerInput(input) {
   const raw = String(input || "").trim().toUpperCase().replace(/\s+/g, " ");
   if (!raw) return "";
@@ -462,10 +487,50 @@ function mockApiPlugin(runtimeEnv) {
               return;
             }
 
-            const snap = await admin.firestore.collection("portfolios").doc(uid).get();
-            const data = snap.exists ? (snap.data() || {}) : {};
-            const trades = Array.isArray(data.trades) ? data.trades : [];
-            sendJson(res, 200, { uid, trades, source: "firestore", collection: "portfolios" });
+            const optpilotDoc = admin.firestore.collection("Optpilot").doc(uid);
+
+            let trades = [];
+            let source = "firestore";
+            let collection = "";
+
+            const collSnap = await optpilotDoc.collection("Portfolio.Trades").get();
+            if (!collSnap.empty) {
+              trades = collSnap.docs
+                .map((doc) => extractTradeRows(doc.data() || {}))
+                .flat();
+              if (!trades.length) {
+                trades = collSnap.docs
+                  .map((doc) => doc.data() || {})
+                  .filter((row) => row && typeof row === "object");
+              }
+              collection = `Optpilot/${uid}/Portfolio.Trades`;
+            }
+
+            if (!trades.length) {
+              const tradesDocSnap = await optpilotDoc.collection("trades.json").doc("latest").get();
+              if (tradesDocSnap.exists) {
+                trades = extractTradeRows(tradesDocSnap.data() || {});
+                collection = `Optpilot/${uid}/trades.json/latest`;
+              }
+            }
+
+            if (!trades.length) {
+              const rootDocSnap = await optpilotDoc.get();
+              if (rootDocSnap.exists) {
+                trades = extractTradeRows(rootDocSnap.data() || {});
+                collection = `Optpilot/${uid}`;
+              }
+            }
+
+            if (!trades.length) {
+              const legacySnap = await admin.firestore.collection("portfolios").doc(uid).get();
+              const legacyData = legacySnap.exists ? (legacySnap.data() || {}) : {};
+              trades = extractTradeRows(legacyData);
+              collection = `portfolios/${uid}`;
+              source = "firestore-legacy";
+            }
+
+            sendJson(res, 200, { uid, trades, source, collection });
           } catch (error) {
             const message = error instanceof Error ? error.message : "Authentication required";
             const status = message.includes("forbidden") ? 403 : 401;

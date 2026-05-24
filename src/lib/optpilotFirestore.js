@@ -1,4 +1,4 @@
-import { buildOptpilotAuthHeaders, getOptpilotTestUserConfig } from "./optpilotFirebaseAuth.js";
+import { buildOptpilotAuthHeaders, getCurrentUser, getOptpilotTestUserConfig } from "./optpilotFirebaseAuth.js";
 
 export function resolveOptpilotUserId(userKey) {
   const key = String(userKey || "A").toUpperCase();
@@ -34,8 +34,9 @@ function normalizeTradeRows(payload) {
   return [];
 }
 
-export async function loadOptpilotTradeRows(userKey) {
-  const headers = await buildOptpilotAuthHeaders(userKey);
+export async function loadOptpilotTradeRows(input) {
+  const options = typeof input === "object" && input !== null ? input : { userKey: input };
+  const headers = await buildOptpilotAuthHeaders(options);
   const response = await fetch("/api/trades", {
     headers,
     credentials: "same-origin",
@@ -53,15 +54,22 @@ export async function loadOptpilotTradeRows(userKey) {
 
   const payload = await response.json();
   const rows = normalizeTradeRows(payload);
+  const currentUser = await getCurrentUser().catch(() => null);
+  const authUid = String(payload?.uid || options.uid || currentUser?.uid || resolveOptpilotUserId(options.userKey)).trim();
+  const sourcePath = payload?.collection && authUid
+    ? `${payload.collection}/${authUid}`
+    : resolveOptpilotCollectionPath(options.userKey);
+
   if (!rows.length) {
     throw new Error("No trade rows found for the signed-in user.");
   }
 
   return {
     rows,
-    sourcePath: resolveOptpilotCollectionPath(userKey),
+    sourcePath,
     sourceType: "api-trades",
     authEnabled: true,
-    authUid: resolveOptpilotUserId(userKey),
+    authUid,
+    authLogin: currentUser?.email || currentUser?.displayName || "",
   };
 }

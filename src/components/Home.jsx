@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useOptPilotAuth } from "../context/OptPilotAuthContext.jsx";
 
 export default function Home() {
-  const { ready, user, selectedUserKey, openDialog, logout, busy, authError } = useOptPilotAuth();
+  const { ready, user, openDialog, logout, busy, authError } = useOptPilotAuth();
 
   return (
     <div className="home-container">
@@ -17,7 +17,7 @@ export default function Home() {
           <div>
             <div className="home-auth-title">OptPilot Access</div>
             <div className="home-auth-sub">
-              {ready ? (user ? `Signed in as ${user.displayName || user.email || user.uid} (${selectedUserKey})` : "Not signed in") : "Loading auth runtime..."}
+              {ready ? (user ? `Signed in as ${user.displayName || user.email || user.uid}` : "Not signed in") : "Loading auth runtime..."}
             </div>
             {authError ? <div className="home-auth-error">{authError}</div> : null}
           </div>

@@ -155,12 +155,16 @@ export async function getIdToken(forceRefresh = false) {
   return user.getIdToken(forceRefresh);
 }
 
-export async function buildOptpilotAuthHeaders(userKey) {
+export async function buildOptpilotAuthHeaders(input) {
   const headers = {};
-  const user = getOptpilotTestUserConfig(userKey);
+  const options = typeof input === "object" && input !== null ? input : { userKey: input };
+  const user = getOptpilotTestUserConfig(options.userKey);
+  const explicitUid = String(options.uid || "").trim();
+  const currentUser = await getCurrentUser().catch(() => null);
+  const uid = explicitUid || currentUser?.uid || user.uid;
 
-  if (user.uid) {
-    headers["X-OptPilot-UID"] = user.uid;
+  if (uid) {
+    headers["X-OptPilot-UID"] = uid;
   }
 
   const token = await getIdToken();

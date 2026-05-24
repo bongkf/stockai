@@ -124,13 +124,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .fade-in{animation:fadeIn 0.3s ease forwards}
 
 /* OptPilot dashboard */
-.optpilot-page{padding:20px 24px 28px;background:#f4f7fb;min-height:100vh}
-.optpilot-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.optpilot-title{margin:0;font-size:1.35rem;color:#0b3a83}
-.optpilot-subtitle{margin:4px 0 0;color:#52607a;font-size:0.9rem}
-.optpilot-upload-btn{background:#0b4fa8;color:#fff;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:600}
+.optpilot-page{padding:16px 20px 28px;background:#f4f7fb;min-height:100vh}
+.optpilot-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:#fff;border:1px solid #d8e0ec;border-radius:10px}
+.optpilot-topbar-left{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0}
+.optpilot-topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.optpilot-title{font-size:1.05rem;font-weight:700;color:#0b3a83;white-space:nowrap}
+.optpilot-topbar-source{font-size:0.72rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
+.optpilot-upload-btn{background:#0b4fa8;color:#fff;border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:600;font-size:0.85rem}
 .optpilot-upload-btn:disabled{opacity:0.7;cursor:not-allowed}
-.optpilot-controls{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.optpilot-diag-toggle{display:flex;align-items:center;gap:4px;font-size:0.78rem;color:#64748b;cursor:pointer;-webkit-user-select:none;user-select:none;white-space:nowrap}
 .optpilot-user-tabs{display:flex;gap:8px;flex-wrap:wrap}
 .optpilot-user-btn{border:1px solid #d1dae8;background:#fff;color:#334155;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
 .optpilot-user-btn.active{border-color:#0b4fa8;background:#eff6ff;color:#0b3a83}
@@ -144,41 +146,109 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .optpilot-kpi span{font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.06em}
 .optpilot-kpi strong{font-size:1.06rem;color:#0f172a}
 
-.optpilot-layout{display:grid;grid-template-columns:320px 1fr;gap:12px}
-.optpilot-sidebar{background:#fff;border:1px solid #d8e0ec;border-radius:10px;padding:12px}
+.optpilot-layout{display:grid;grid-template-columns:320px 1fr;gap:12px;min-width:0}
+.optpilot-sidebar{background:#fff;border:1px solid #d8e0ec;border-radius:10px;padding:12px;min-width:0}
 .optpilot-sidebar h3{margin:0 0 10px;font-size:0.95rem;color:#1e293b}
-.optpilot-weeks-list{display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow:auto}
-.optpilot-week-btn{border:1px solid #dbe3f0;background:#fff;border-radius:8px;padding:10px;text-align:left;cursor:pointer}
+.optpilot-weeks-list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 260px);overflow:auto}
+.optpilot-week-btn{border:1px solid #dbe3f0;background:#fff;border-radius:8px;padding:10px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;flex-shrink:0}
 .optpilot-week-btn.active{border-color:#0b4fa8;background:#eff6ff}
-.wk-label{font-weight:600;color:#0f172a}
+.wk-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.wk-label{font-weight:700;color:#0f172a;flex:1;min-width:0}
+.wk-line2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:3px;flex-wrap:wrap}
 .wk-meta{font-size:0.78rem;color:#64748b;margin-top:3px}
-.wk-net{font-size:0.8rem;color:#0b4fa8;margin-top:6px;font-weight:600}
+.wk-trades{font-size:0.74rem;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.wk-stats-inline{font-size:0.74rem;color:#475569;margin-top:6px;line-height:1.3}
+.wk-net-chip{font-size:0.74rem;font-weight:700;border-radius:999px;padding:3px 8px;white-space:nowrap;flex-shrink:0}
+.wk-net-chip.positive{background:#ecfdf3;color:#166534;border:1px solid #bbf7d0}
+.wk-net-chip.negative{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
 
-.optpilot-main{background:#fff;border:1px solid #d8e0ec;border-radius:10px;padding:14px}
+.optpilot-main{background:#fff;border:1px solid #d8e0ec;border-radius:10px;padding:14px;min-width:0}
 .optpilot-week-header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .optpilot-week-header h2{margin:0;font-size:1.1rem;color:#1e293b}
+.optpilot-week-header-meta{color:#334155;font-size:0.86rem;line-height:1.35}
 .optpilot-week-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .optpilot-stat{border:1px solid #dbe3f0;border-radius:8px;padding:10px;background:#fafcff;display:flex;flex-direction:column;gap:3px}
 .optpilot-stat span{font-size:0.75rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em}
 .optpilot-stat strong{font-size:0.98rem;color:#0f172a}
 
-.optpilot-table-wrap{margin-bottom:12px}
+.optpilot-table-wrap{margin-bottom:12px;overflow-x:auto;overflow-y:hidden}
+.optpilot-table-wrap::-webkit-scrollbar{height:8px}
+.optpilot-table-wrap::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}
+.optpilot-table-wrap::-webkit-scrollbar-track{background:transparent}
 .optpilot-table-wrap h3{margin:0 0 8px;font-size:0.95rem;color:#334155}
-.optpilot-table{width:100%;border-collapse:collapse;font-size:0.83rem}
+.optpilot-table{width:100%;min-width:820px;border-collapse:collapse;font-size:0.83rem}
 .optpilot-table th,.optpilot-table td{border:1px solid #e5eaf2;padding:7px 8px;text-align:left}
 .optpilot-table th{background:#f8fafc;color:#334155}
 .optpilot-table tbody tr:nth-child(even){background:#fcfdff}
 
+@media (max-width: 1280px){
+  .optpilot-layout{grid-template-columns:280px 1fr}
+}
+
 @media (max-width: 1140px){
   .optpilot-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+
+@media (max-width: 980px){
+  .optpilot-page{padding:14px}
+  .optpilot-topbar{padding:8px 10px}
+  .optpilot-topbar-left{align-items:flex-start;gap:6px}
+  .optpilot-topbar-source{white-space:normal;max-width:none;line-height:1.35}
+  .optpilot-topbar-right{width:100%;justify-content:flex-start}
+  .optpilot-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .optpilot-layout{grid-template-columns:1fr}
+  .optpilot-weeks-list{max-height:none}
+  .optpilot-week-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
 @media (max-width: 760px){
-  .optpilot-page{padding:14px}
-  .optpilot-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .optpilot-week-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .optpilot-page{padding:12px}
+  .optpilot-title{font-size:0.98rem;white-space:normal}
+  .optpilot-topbar-right{gap:8px;flex-wrap:wrap}
+  .optpilot-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .optpilot-kpi{padding:9px 10px}
+  .optpilot-kpi span{font-size:0.7rem}
+  .optpilot-kpi strong{font-size:0.95rem}
+  .optpilot-week-btn{padding:8px;gap:2px}
+  .wk-label{font-size:0.92rem}
+  .wk-meta{font-size:0.75rem;margin-top:0}
+  .wk-trades{font-size:0.7rem;padding:2px 7px}
+  .wk-stats-inline{font-size:0.72rem;line-height:1.2;margin-top:4px}
+  .wk-net-chip{font-size:0.7rem;padding:2px 7px}
+  .optpilot-weeks-list{
+    max-height:180px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    scroll-snap-type:y proximity;
+    padding-right:2px;
+    padding-bottom:2px;
+    overscroll-behavior-y:contain;
+  }
+  .optpilot-week-btn{
+    min-height:116px;
+    scroll-snap-align:start;
+    scroll-snap-stop:always;
+  }
   .optpilot-main{padding:10px}
-  .optpilot-table{font-size:0.76rem}
+  .optpilot-week-header{align-items:flex-start;flex-direction:column;gap:4px}
+  .optpilot-week-header h2{font-size:1rem}
+  .optpilot-week-header-meta{font-size:0.8rem}
+  .optpilot-week-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .optpilot-stat{padding:8px}
+  .optpilot-stat span{font-size:0.68rem}
+  .optpilot-stat strong{font-size:0.9rem}
+  .optpilot-table{font-size:0.76rem;min-width:720px}
 }
+
+@media (max-width: 420px){
+  .optpilot-summary-grid{grid-template-columns:1fr}
+  .optpilot-week-kpis{grid-template-columns:1fr}
+  .wk-label{font-size:0.88rem}
+  .wk-meta{font-size:0.72rem}
+  .wk-stats-inline{font-size:0.69rem}
+  .wk-net-chip{order:2}
+  .wk-line2{justify-content:flex-start}
+  .optpilot-weeks-list{max-height:170px}
+}
+
 
