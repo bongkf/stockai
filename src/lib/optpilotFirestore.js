@@ -34,6 +34,13 @@ function normalizeTradeRows(payload) {
   return [];
 }
 
+function normalizeHoldingsRows(payload) {
+  if (!payload || typeof payload !== "object") return [];
+  if (Array.isArray(payload.holdings)) return payload.holdings.filter((row) => row && typeof row === "object");
+  if (Array.isArray(payload.rows)) return payload.rows.filter((row) => row && typeof row === "object");
+  return [];
+}
+
 export async function loadOptpilotTradeRows(input) {
   const options = typeof input === "object" && input !== null ? input : { userKey: input };
   const headers = await buildOptpilotAuthHeaders(options);
@@ -68,6 +75,42 @@ export async function loadOptpilotTradeRows(input) {
     rows,
     sourcePath,
     sourceType: "api-trades",
+    authEnabled: true,
+    authUid,
+    authLogin: currentUser?.email || currentUser?.displayName || "",
+  };
+}
+
+export async function loadOptpilotHoldings(input) {
+  const options = typeof input === "object" && input !== null ? input : { userKey: input };
+  const headers = await buildOptpilotAuthHeaders(options);
+  const response = await fetch("/api/holdings", {
+    headers,
+    credentials: "same-origin",
+  });
+
+  if (response.status === 401) {
+    throw new Error("Authentication required. Please log in from Home.");
+  }
+  if (response.status === 403) {
+    throw new Error("Signed-in user does not match the selected test user.");
+  }
+  if (!response.ok) {
+    throw new Error(`Holdings load failed: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const holdings = normalizeHoldingsRows(payload);
+  const currentUser = await getCurrentUser().catch(() => null);
+  const authUid = String(payload?.uid || options.uid || currentUser?.uid || resolveOptpilotUserId(options.userKey)).trim();
+  const sourcePath = payload?.collection && authUid
+    ? `${payload.collection}/${authUid}`
+    : `portfolios/${authUid || "unknown-user"}`;
+
+  return {
+    holdings,
+    sourcePath,
+    sourceType: "api-holdings",
     authEnabled: true,
     authUid,
     authLogin: currentUser?.email || currentUser?.displayName || "",

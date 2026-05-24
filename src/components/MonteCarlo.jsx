@@ -525,10 +525,372 @@ export default function MainApp() {
     [days, results]
   );
 
+  useEffect(
+    () => () => {
+      if (quoteDebounceRef.current) clearTimeout(quoteDebounceRef.current);
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    },
+    []
+  );
+
+  const scenarioKeys = Object.keys(SCENARIOS);
+  const stats = results?.stats;
+
+  const tickerInputKeyDown = (event) => {
+    if (!showSearchResults || !searchResults.length) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runButtonClick();
+      }
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setAcHighlightIdx((prev) => (prev + 1) % searchResults.length);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setAcHighlightIdx((prev) => (prev <= 0 ? searchResults.length - 1 : prev - 1));
+      return;
+    }
+
+    if (event.key === "Escape") {
+      setShowSearchResults(false);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const chosen = searchResults[acHighlightIdx];
+      if (!chosen) {
+        runButtonClick();
+        return;
+      }
+      const symbol = chosen.symbol || chosen.ticker || chosen.code;
+      if (symbol) {
+        selectSuggestion(symbol);
+      } else {
+        runButtonClick();
+      }
+    }
+  };
+
+  const renderActiveChart = () => {
+    if (!results) {
+      return <div className="chart-shell chart-empty">Running simulation...</div>;
+    }
+
+    if (activeTab === "paths") {
+      return (
+        <div className="chart-shell">
+          <div className="chart-title">Sampled Paths ({results.paths.length} of {numPaths})</div>
+          <ResponsiveContainer width="100%" height={324}>
+            <LineChart data={sampledPathData} margin={{ top: 5, right: 16, left: 6, bottom: 5 }}>
+              <CartesianGrid stroke="rgba(0, 45, 114, 0.12)" strokeDasharray="3 3" />
+              <XAxis dataKey="day" stroke="#6b7280" tick={{ fill: "#475467", fontSize: 11 }} />
+              <YAxis
+                stroke="#6b7280"
+                tick={{ fill: "#475467", fontSize: 11 }}
+                tickFormatter={(v) => `$${v.toFixed(1)}`}
+              />
+              <Tooltip content={<ChartTooltip />} />
+              <ReferenceLine y={startPrice} stroke="#1d4ed8" strokeDasharray="5 3" strokeOpacity={0.65} />
+              {results.paths.map((_, idx) => (
+                <Line
+                  key={`path-${idx}`}
+                  type="monotone"
+                  dataKey={`p${idx}`}
+                  dot={false}
+                  stroke={sc.color}
+                  strokeOpacity={0.18}
+                  strokeWidth={1}
+                  isAnimationActive={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    }
+
+    if (activeTab === "band") {
+      return (
+        <div className="chart-shell">
+          <div className="chart-title">Percentile Band (P10-P90)</div>
+          <ResponsiveContainer width="100%" height={324}>
+            <ComposedChart data={bandData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid stroke="rgba(0, 45, 114, 0.14)" strokeDasharray="3 3" />
+              <XAxis dataKey="day" stroke="#6b7280" tick={{ fill: "#475467", fontSize: 11 }} />
+              <YAxis
+                stroke="#6b7280"
+                tick={{ fill: "#475467", fontSize: 11 }}
+                tickFormatter={(v) => `$${v.toFixed(1)}`}
+              />
+              <Tooltip content={<ChartTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "#344054" }} />
+              <ReferenceLine y={startPrice} stroke="#1d4ed8" strokeDasharray="5 3" strokeOpacity={0.6} />
+
+              <Area type="monotone" dataKey="p90" stroke="none" fill={sc.color} fillOpacity={0.13} legendType="none" />
+              <Area type="monotone" dataKey="p10" stroke="none" fill="#ffffff" fillOpacity={1} legendType="none" />
+              <Area type="monotone" dataKey="p75" stroke="none" fill={sc.color} fillOpacity={0.2} legendType="none" />
+              <Area type="monotone" dataKey="p25" stroke="none" fill="#ffffff" fillOpacity={1} legendType="none" />
+
+              <Line type="monotone" dataKey="p50" stroke={sc.color} strokeWidth={2.4} dot={false} name="Median (P50)" />
+              <Line type="monotone" dataKey="p10" stroke="#667085" strokeWidth={1.3} dot={false} name="P10" />
+              <Line type="monotone" dataKey="p90" stroke="#667085" strokeWidth={1.3} dot={false} name="P90" />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    }
+
+    if (activeTab === "hist") {
+      return (
+        <div className="chart-shell">
+          <div className="chart-title">Terminal Price Distribution</div>
+          <ResponsiveContainer width="100%" height={324}>
+            <BarChart data={results.hist} margin={{ top: 8, right: 16, left: 6, bottom: 6 }}>
+              <CartesianGrid stroke="rgba(0, 45, 114, 0.12)" strokeDasharray="3 3" />
+              <XAxis dataKey="price" tick={{ fill: "#475467", fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+              <YAxis tick={{ fill: "#475467", fontSize: 11 }} />
+              <Tooltip
+                contentStyle={{ background: "#ffffff", border: "1px solid #dbe5f4", borderRadius: 6, fontSize: 11 }}
+                formatter={(val, name) => [val, name === "count" ? "Paths" : name]}
+                labelFormatter={(label) => `Price bucket: $${label}`}
+              />
+              <Bar dataKey="count" fill={sc.color} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    }
+
+    return <AllScenariosCompare startPrice={startPrice} days={days} numPaths={Math.min(900, numPaths)} />;
+  };
+
   return (
     <div ref={appRef} className="wrapper">
-      {/* The rest of the UI is intentionally lengthy; styles moved to src/styles.css */}
-      <div className="mc-content">Monte Carlo component (UI omitted in this copy for brevity)</div>
+      <div className="header-section">
+        <div className="header-top">
+          <div className="header-brand">
+            <div className="header-icon">MC</div>
+            <div>
+              <h1 className="header-title">Shell Monte Carlo Scenario Engine</h1>
+              <div className="header-subtitle">Geopolitical Shock Paths · GBM Model · Multi-scenario Dashboard</div>
+            </div>
+          </div>
+          <div className="header-live">
+            <span className="live-dot" style={{ background: sc.accent }} />
+            Scenario: {sc.label}
+          </div>
+        </div>
+      </div>
+
+      <div className="page-body">
+        <div className="ticker-toolbar">
+          <div className="ticker-summary">
+            <strong>{ticker}</strong>
+            <span>{sc.sublabel}</span>
+          </div>
+          <button
+            type="button"
+            className="toggle-ticker-btn"
+            onClick={() => setIsTickerExpanded((prev) => !prev)}
+          >
+            {isTickerExpanded ? "Collapse Inputs" : "Expand Inputs"}
+          </button>
+        </div>
+
+        <div className={`search-box ${isTickerExpanded ? "" : "compact"}`}>
+          <div className="input-group ticker-group ticker-picker">
+            <label htmlFor="mc-ticker">Ticker</label>
+            <input
+              id="mc-ticker"
+              className="input-field"
+              value={inputTicker}
+              onChange={(e) => {
+                setInputTicker(e.target.value.toUpperCase());
+                setShowSearchResults(true);
+              }}
+              onKeyDown={tickerInputKeyDown}
+              onFocus={() => {
+                if (searchResults.length) setShowSearchResults(true);
+              }}
+              placeholder="SHELL.AS"
+            />
+            {showSearchResults && searchResults.length > 0 ? (
+              <div className="ticker-autocomplete">
+                {searchResults.map((item, idx) => {
+                  const symbol = String(item.symbol || item.ticker || item.code || "").toUpperCase();
+                  const name = item.name || item.description || "";
+                  const type = item.type || item.exchange || item.market || "";
+                  return (
+                    <div
+                      key={`${symbol}-${idx}`}
+                      className={`ac-item ${idx === acHighlightIdx ? "ac-item-active" : ""}`}
+                      onMouseEnter={() => setAcHighlightIdx(idx)}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        if (symbol) selectSuggestion(symbol);
+                      }}
+                    >
+                      <strong>{symbol || "--"}</strong>
+                      <span className="ac-name">{name}</span>
+                      {type ? <span className="ac-type">{type}</span> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+            <div className={`search-meta ${searchError ? "error" : ""}`}>
+              {searchError || (searchLoading ? "Searching..." : "Press Enter to run with current ticker")}
+            </div>
+          </div>
+
+          <div className="input-group price-group">
+            <label htmlFor="mc-price">Start Price</label>
+            <input
+              id="mc-price"
+              type="number"
+              className="input-field"
+              value={inputPrice}
+              onChange={(e) => setInputPrice(e.target.value)}
+              min="0.01"
+              step="0.01"
+            />
+          </div>
+
+          <div className="input-group anchor-date-group">
+            <label htmlFor="mc-anchor-date">Anchor Date</label>
+            <input
+              id="mc-anchor-date"
+              type="date"
+              className="input-field"
+              value={anchorDate}
+              onChange={(e) => setAnchorDate(e.target.value)}
+              max={todayISO}
+            />
+          </div>
+
+          <div className="input-group horizon-group">
+            <label htmlFor="mc-days">Days</label>
+            <input
+              id="mc-days"
+              type="number"
+              className="input-field"
+              value={days}
+              onChange={(e) => setDays(Math.max(10, Math.min(720, Number.parseInt(e.target.value || "90", 10) || 90)))}
+              min="10"
+              max="720"
+              step="5"
+            />
+          </div>
+
+          <div className="input-group paths-group">
+            <label htmlFor="mc-paths">Paths</label>
+            <input
+              id="mc-paths"
+              type="number"
+              className="input-field"
+              value={numPaths}
+              onChange={(e) => setNumPaths(Math.max(100, Math.min(5000, Number.parseInt(e.target.value || "500", 10) || 500)))}
+              min="100"
+              max="5000"
+              step="100"
+            />
+          </div>
+
+          <div className="input-group action-group">
+            <button type="button" className="run-btn" onClick={runButtonClick} disabled={isRunning}>
+              {isRunning ? "Running" : "Run"}
+            </button>
+          </div>
+        </div>
+
+        <div className="ticker-quote">
+          <span id="quote-symbol">{quoteState.symbol}</span>
+          <span id="quote-price">{quoteState.priceText}</span>
+          <span className={quoteState.changeClass}>{quoteState.changeText}</span>
+          {quoteState.isLoading ? <span className="quote-flag">Loading</span> : null}
+          {quoteState.error ? <span className="search-meta error">{quoteState.error}</span> : null}
+          <span id="quote-updated">{quoteState.updatedText}</span>
+        </div>
+
+        <div className="scenario-grid">
+          {scenarioKeys.map((key) => {
+            const item = SCENARIOS[key];
+            const active = key === scenario;
+            return (
+              <button
+                key={key}
+                type="button"
+                className="sc-btn"
+                onClick={() => setScenario(key)}
+                style={{
+                  borderColor: active ? item.accent : "#d0d5dd",
+                  boxShadow: active ? `0 0 0 2px ${item.glow}` : "none",
+                  padding: "10px",
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ fontSize: "0.75rem", fontWeight: 700, color: item.color }}>{item.label}</div>
+                <div style={{ marginTop: 2, fontSize: "0.82rem", color: "#344054" }}>{item.sublabel}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="stats-grid">
+          <StatCard
+            label="P50 Terminal"
+            value={`$${fmt(stats?.p50)}`}
+            sub={stats ? `${fmtPct(stats.p50 / startPrice - 1)} vs start` : "--"}
+            color={sc.color}
+          />
+          <StatCard
+            label="Mean Terminal"
+            value={`$${fmt(stats?.mean)}`}
+            sub={stats ? `${fmtPct(stats.mean / startPrice - 1)} expected` : "--"}
+            color={sc.color}
+          />
+          <StatCard
+            label="P10 / P90"
+            value={stats ? `$${fmt(stats.p10)} / $${fmt(stats.p90)}` : "--"}
+            sub="Tail range"
+            color={sc.color}
+          />
+          <StatCard
+            label="Prob Above Start"
+            value={stats ? `${fmt(stats.pAbove, 1)}%` : "--"}
+            sub="Final price > start"
+            color={sc.color}
+          />
+          <StatCard
+            label="Avg Max Drawdown"
+            value={stats ? fmtPct(-stats.avgMaxDD) : "--"}
+            sub="Peak-to-trough average"
+            color={sc.color}
+          />
+        </div>
+
+        <div className="scenario-copy">
+          <div className="scenario-copy-title">Scenario Brief</div>
+          <div className="scenario-copy-body">{sc.description}</div>
+          <div className="scenario-copy-risks">Key Risks: {sc.keyRisks.join(" · ")}</div>
+        </div>
+
+        <div className="tab-row">
+          <button type="button" className={`tab-btn ${activeTab === "paths" ? "active" : ""}`} onClick={() => setActiveTab("paths")}>Paths</button>
+          <button type="button" className={`tab-btn ${activeTab === "band" ? "active" : ""}`} onClick={() => setActiveTab("band")}>Band</button>
+          <button type="button" className={`tab-btn ${activeTab === "hist" ? "active" : ""}`} onClick={() => setActiveTab("hist")}>Histogram</button>
+          <button type="button" className={`tab-btn ${activeTab === "compare" ? "active" : ""}`} onClick={() => setActiveTab("compare")}>Compare</button>
+        </div>
+
+        {renderActiveChart()}
+      </div>
     </div>
   );
 }
