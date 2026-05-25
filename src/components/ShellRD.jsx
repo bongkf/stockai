@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadOptpilotTradeRows } from "../lib/optpilotFirestore.js";
+import { loadOptpilotOptionExpiries } from "../lib/optpilotMarketData.js";
 import { useOptPilotAuth } from "../context/OptPilotAuthContext.jsx";
 
 function erf(x) {
@@ -59,11 +60,11 @@ const LADDER_SCENARIOS = [
     label: "Balanced Stagger",
     description: "Spread contracts across near and medium dates for smoother weekly management.",
     legs: [
-      { id: "may", label: "May 15", days: 18, strike: 40 },
-      { id: "jun", label: "Jun 19", days: 53, strike: 41 },
-      { id: "jul", label: "Jul 17", days: 81, strike: 42 },
-      { id: "sep", label: "Sep 18", days: 144, strike: 43 },
-      { id: "nov", label: "Nov 21", days: 208, strike: 45 },
+      { id: "jun", label: "Jun 26", days: 32, strike: 40 },
+      { id: "jul", label: "Jul 17", days: 53, strike: 41 },
+      { id: "aug", label: "Aug 21", days: 88, strike: 42 },
+      { id: "sep", label: "Sep 18", days: 116, strike: 43 },
+      { id: "nov", label: "Nov 20", days: 179, strike: 45 },
     ],
   },
   {
@@ -71,11 +72,11 @@ const LADDER_SCENARIOS = [
     label: "Income Front-Loaded",
     description: "More short-dated calls to collect premium faster, with higher monitoring needed.",
     legs: [
-      { id: "may", label: "May 15", days: 18, strike: 39.5 },
-      { id: "jun", label: "Jun 19", days: 53, strike: 40.5 },
-      { id: "aug", label: "Aug 21", days: 116, strike: 41.5 },
-      { id: "oct", label: "Oct 16", days: 172, strike: 42.5 },
-      { id: "nov", label: "Nov 21", days: 208, strike: 43.5 },
+      { id: "jun", label: "Jun 26", days: 32, strike: 39.5 },
+      { id: "jul", label: "Jul 17", days: 53, strike: 40.5 },
+      { id: "aug", label: "Aug 21", days: 88, strike: 41.5 },
+      { id: "oct", label: "Oct 16", days: 144, strike: 42.5 },
+      { id: "nov", label: "Nov 20", days: 179, strike: 43.5 },
     ],
   },
   {
@@ -83,11 +84,11 @@ const LADDER_SCENARIOS = [
     label: "Defensive Upside",
     description: "Higher strikes and wider spacing to keep more upside if Shell rallies strongly.",
     legs: [
-      { id: "jun", label: "Jun 19", days: 53, strike: 41.5 },
-      { id: "aug", label: "Aug 21", days: 116, strike: 42.5 },
-      { id: "sep", label: "Sep 18", days: 144, strike: 43.5 },
-      { id: "nov", label: "Nov 21", days: 208, strike: 45 },
-      { id: "jan", label: "Jan 16", days: 264, strike: 46 },
+      { id: "jul", label: "Jul 17", days: 53, strike: 41.5 },
+      { id: "aug", label: "Aug 21", days: 88, strike: 42.5 },
+      { id: "sep", label: "Sep 18", days: 116, strike: 43.5 },
+      { id: "oct", label: "Oct 16", days: 144, strike: 45 },
+      { id: "nov", label: "Nov 20", days: 179, strike: 46 },
     ],
   },
 ];
@@ -97,11 +98,11 @@ const OPTIMIZED_LADDER_TEMPLATE = {
   label: "Max Risk-Adjusted",
   description: "Auto-picks strikes to maximize risk-adjusted net premium under the current IV and spot.",
   legs: [
-    { id: "may", label: "May 15", days: 18 },
-    { id: "jun", label: "Jun 19", days: 53 },
-    { id: "aug", label: "Aug 21", days: 116 },
-    { id: "oct", label: "Oct 16", days: 172 },
-    { id: "jan", label: "Jan 16", days: 264 },
+    { id: "jun", label: "Jun 26", days: 32 },
+    { id: "jul", label: "Jul 17", days: 53 },
+    { id: "aug", label: "Aug 21", days: 88 },
+    { id: "sep", label: "Sep 18", days: 116 },
+    { id: "nov", label: "Nov 20", days: 179 },
   ],
 };
 
@@ -192,7 +193,7 @@ function expiryLabelFromIso(iso) {
   const dt = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(dt.getTime())) return iso;
   const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${names[dt.getMonth()]} ${dt.getDate()}`;
+  return `${names[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
 }
 
 function parseExpiryToken(token) {
@@ -490,6 +491,15 @@ export default function ShellRD() {
   const [loading, setLoading] = useState(false);
   const [feeEstimate, setFeeEstimate] = useState({ perContract: 0, sampleCount: 0 });
   const [ladderScenarioId, setLadderScenarioId] = useState(OPTIMIZED_LADDER_TEMPLATE.id);
+  const [optionExpiryCheck, setOptionExpiryCheck] = useState({
+    symbol: "SHELL.AS",
+    requestedSymbol: "SHELL.AS",
+    availableExpiries: [],
+    optionCount: 0,
+    source: "yahoo-options",
+    checkedAt: "",
+    error: "",
+  });
 
   useEffect(() => {
     if (!ready) return;
@@ -568,6 +578,49 @@ export default function ShellRD() {
       cancelled = true;
     };
   }, [ready, user, openDialog]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!user) {
+      setOptionExpiryCheck({
+        symbol: "SHELL.AS",
+        requestedSymbol: "SHELL.AS",
+        availableExpiries: [],
+        optionCount: 0,
+        source: "yahoo-options",
+        checkedAt: "",
+        error: "",
+      });
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadOptionAvailability() {
+      try {
+        const payload = await loadOptpilotOptionExpiries("SHELL.AS");
+        if (cancelled) return;
+        setOptionExpiryCheck(payload);
+      } catch (error) {
+        if (cancelled) return;
+        setOptionExpiryCheck({
+          symbol: "SHELL.AS",
+          requestedSymbol: "SHELL.AS",
+          availableExpiries: [],
+          optionCount: 0,
+          source: "yahoo-options",
+          checkedAt: "",
+          error: error instanceof Error ? error.message : "Options availability unavailable",
+        });
+      }
+    }
+
+    loadOptionAvailability();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, user]);
 
   const optimizedScenario = useMemo(() => {
     const startStrike = roundUpToHalf(Math.max(spot, 1));
@@ -709,16 +762,45 @@ export default function ShellRD() {
     : 0;
   const coverageDiffShares = shares - effectiveContracts * 100;
   const uncoveredShares = Math.max(0, coverageDiffShares);
+  const liveOptionExpiries = new Set(optionExpiryCheck.availableExpiries || []);
+  const hasLiveOptionExpiries = liveOptionExpiries.size > 0;
 
   const rollRecommendations = useMemo(() => {
     if (!activeLegs.length) return [];
 
     const expiryUniverse = rollCandidatesFromToday(today);
     const strikeSteps = [0.5, 1, 2, 3, 4];
+    const reservedTargetLegs = new Set();
+    const todayIso = isoDate(today);
+    const minCoveredCallStrike = roundUpToHalf(Math.max(spot, 1));
+    const minTargetDays = 30;
+    const maxTargetDays = 180;
+    const staggeredTargetDays = activeLegs.map((_, idx) => {
+      if (activeLegs.length <= 1) return 105;
+      const spread = maxTargetDays - minTargetDays;
+      return Math.round(minTargetDays + (spread * idx) / (activeLegs.length - 1));
+    });
+
+    function targetDays(expiryIso) {
+      const expiryDate = toDateFromIso(expiryIso);
+      if (!expiryDate) return Number.NaN;
+      return Math.max(0, Math.ceil((expiryDate.getTime() - today.getTime()) / 86400000));
+    }
+
+    function isAllowedTargetExpiry(expiryIso) {
+      const days = targetDays(expiryIso);
+      return Number.isFinite(days) && days >= minTargetDays && days <= maxTargetDays;
+    }
+
+    function targetDistance(expiryIso, targetDay) {
+      const days = targetDays(expiryIso);
+      if (!Number.isFinite(days)) return Number.POSITIVE_INFINITY;
+      return Math.abs(days - targetDay);
+    }
 
     function optionPrice(strike, expiryIso) {
       const expiryDate = toDateFromIso(expiryIso);
-      if (!expiryDate) return null;
+      if (!expiryDate || expiryIso < todayIso) return null;
       const days = Math.max(1, Math.ceil((expiryDate.getTime() - today.getTime()) / 86400000));
       const T = Math.max(1 / 365, days / 365);
       return {
@@ -736,12 +818,37 @@ export default function ShellRD() {
       });
     }
 
-    function buildCandidate(expiry, strike, next, currentModel) {
+    function pickBestStaggered(candidates, targetDay) {
+      const positiveCandidates = candidates.filter((candidate) => candidate.netCreditPerContract > 0);
+      if (!positiveCandidates.length) return null;
+
+      const rankedCandidates = [...positiveCandidates].sort((left, right) => {
+        const leftDistance = targetDistance(left.expiry, targetDay);
+        const rightDistance = targetDistance(right.expiry, targetDay);
+        if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+
+        const leftScore = left.netCreditPerContract;
+        const rightScore = right.netCreditPerContract;
+        return rightScore - leftScore;
+      });
+
+      for (const candidate of rankedCandidates) {
+        const reservationKey = `${candidate.expiry}|${candidate.strike.toFixed(2)}`;
+        if (reservedTargetLegs.has(reservationKey)) continue;
+        reservedTargetLegs.add(reservationKey);
+        return candidate;
+      }
+
+      return null;
+    }
+
+    function buildCandidate(actionLabel, expiry, strike, next, currentModel) {
       const grossCreditPerContract = (next.call - currentModel.call) * 100;
       const estimatedRollFeePerContract = feeEstimate.sampleCount > 0 ? feeEstimate.perContract * 2 : 0;
       const netCreditPerContract = grossCreditPerContract - estimatedRollFeePerContract;
       const riskPenaltyPerContract = next.prob * ASSIGNMENT_PENALTY_PER_CONTRACT;
       return {
+        actionLabel,
         expiry,
         strike,
         prob: next.prob,
@@ -754,73 +861,95 @@ export default function ShellRD() {
     }
 
     return activeLegs.map((leg) => {
+      if (leg.expiry < todayIso) return null;
+
       const currentModel = optionPrice(leg.strike, leg.expiry);
       if (!currentModel) return null;
 
-      const outCandidates = expiryUniverse
-        .filter((exp) => exp > leg.expiry)
-        .map((exp) => {
-          const next = optionPrice(leg.strike, exp);
-          if (!next) return null;
-          return buildCandidate(exp, leg.strike, next, currentModel);
-        })
-        .filter(Boolean);
+      const rollBaselineExpiry = leg.expiry > todayIso ? leg.expiry : todayIso;
+      const targetDay = staggeredTargetDays.shift() ?? maxTargetDays;
 
-      const upCandidates = expiryUniverse.flatMap((exp) => (
-        strikeSteps.map((step) => {
-          const nextStrike = leg.strike + step;
-          const next = optionPrice(nextStrike, exp);
-          if (!next) return null;
-          return buildCandidate(exp, nextStrike, next, currentModel);
-        })
-      )).filter(Boolean);
+      const candidates = expiryUniverse
+        .filter((exp) => exp > rollBaselineExpiry && isAllowedTargetExpiry(exp))
+        .filter((exp) => !hasLiveOptionExpiries || liveOptionExpiries.has(exp))
+        .flatMap((exp) => {
+          const nextSameStrike = optionPrice(leg.strike, exp);
+          const laterExpiry = nextSameStrike ? [buildCandidate("Later expiry", exp, leg.strike, nextSameStrike, currentModel)] : [];
 
-      const downCandidates = expiryUniverse.flatMap((exp) => (
-        strikeSteps.map((step) => {
-          const nextStrike = leg.strike - step;
-          if (nextStrike <= 0) return null;
-          const next = optionPrice(nextStrike, exp);
-          if (!next) return null;
-          return buildCandidate(exp, nextStrike, next, currentModel);
-        })
-      )).filter(Boolean);
+          const higherStrike = strikeSteps.map((step) => {
+            const nextStrike = leg.strike + step;
+            const next = optionPrice(nextStrike, exp);
+            return next ? buildCandidate("Higher strike", exp, nextStrike, next, currentModel) : null;
+          });
 
-      const out = pickBest(outCandidates);
-      const up = pickBest(upCandidates);
-      const down = pickBest(downCandidates);
+          const lowerStrike = strikeSteps.map((step) => {
+            const nextStrike = leg.strike - step;
+            if (nextStrike < minCoveredCallStrike) return null;
+            const next = optionPrice(nextStrike, exp);
+            return next ? buildCandidate("Lower strike", exp, nextStrike, next, currentModel) : null;
+          });
+
+          return [...laterExpiry, ...higherStrike, ...lowerStrike];
+        })
+        .filter((candidate) => candidate && candidate.strike >= minCoveredCallStrike);
+
+      const recommendation = pickBestStaggered(candidates, targetDay) || {
+        actionLabel: "Hold",
+        expiry: leg.expiry,
+        strike: leg.strike,
+        prob: currentModel.prob,
+        grossCreditPerContract: 0,
+        estimatedRollFeePerContract: 0,
+        netCreditPerContract: 0,
+        riskPenaltyPerContract: 0,
+        adjustedScorePerContract: 0,
+        isHold: true,
+      };
 
       return {
         key: `${leg.ticker}-${leg.expiry}-${leg.strike}`,
         leg,
         buybackPerContract: currentModel.call * 100,
-        out,
-        up,
-        down,
+        recommendation,
       };
     }).filter(Boolean);
-  }, [activeLegs, feeEstimate, iv, spot, today, useRiskAdjusted]);
+  }, [activeLegs, feeEstimate, hasLiveOptionExpiries, iv, liveOptionExpiries, spot, today, useRiskAdjusted]);
 
-  function renderRollChoice(choice, contracts, actionLabel) {
+  const recommendedRolls = rollRecommendations.filter((r) => !r.recommendation?.isHold);
+  const grandTotalBtcCost = recommendedRolls.reduce((sum, r) => sum + r.buybackPerContract * r.leg.contracts, 0);
+  const grandTotalStoPremium = recommendedRolls.reduce((sum, r) => {
+    return sum + r.recommendation.grossCreditPerContract * r.leg.contracts;
+  }, 0);
+  const grandTotalNetPremium = grandTotalStoPremium - grandTotalBtcCost;
+
+  function renderRollRecommendation(choice, contracts) {
     if (!choice) return "-";
 
     const totalCredit = choice.netCreditPerContract * contracts;
     const totalAdjusted = choice.adjustedScorePerContract * contracts;
+    const isHold = Boolean(choice.isHold);
 
     return (
       <div style={{ display: "grid", gap: "2px" }}>
         <div style={{ fontWeight: 700 }}>
-          {actionLabel}: move to {expiryLabelFromIso(choice.expiry)} at €{choice.strike.toFixed(2)}
+          {isHold ? "Hold current call" : `${choice.actionLabel}: move to ${expiryLabelFromIso(choice.expiry)} at €${choice.strike.toFixed(2)}`}
         </div>
-        <div>
-          Extra premium now (after est. fees): {EUR(totalCredit)}
-          {useRiskAdjusted ? ` (risk-adjusted: ${EUR(totalAdjusted)})` : ""}
-        </div>
-        <div style={{ color: "#6b5030" }}>
-          Estimated roll fees: {feeEstimate.sampleCount > 0 ? EUR((choice.estimatedRollFeePerContract || 0) * contracts) : "Unavailable (no fee samples found)"}
-        </div>
-        <div style={{ color: "#6b5030" }}>
-          Call-away chance: {(choice.prob * 100).toFixed(1)}% ({assignmentRiskLabel(choice.prob)})
-        </div>
+        {isHold ? (
+          <div style={{ color: "#6b5030" }}>No staggered roll inside the 30-180 DTE window meets the spot floor. Keep the current call.</div>
+        ) : (
+          <>
+            <div>
+              Extra premium now (after est. fees): {EUR(totalCredit)}
+              {useRiskAdjusted ? ` (risk-adjusted: ${EUR(totalAdjusted)})` : ""}
+            </div>
+            <div style={{ color: "#6b5030" }}>
+              Estimated roll fees: {feeEstimate.sampleCount > 0 ? EUR((choice.estimatedRollFeePerContract || 0) * contracts) : "Unavailable (no fee samples found)"}
+            </div>
+            <div style={{ color: "#6b5030" }}>
+              Call-away chance: {(choice.prob * 100).toFixed(1)}% ({assignmentRiskLabel(choice.prob)})
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -870,6 +999,15 @@ export default function ShellRD() {
             {uncoveredShares} shares are currently uncovered (not enough for an additional full 100-share contract).
           </div>
         ) : null}
+
+        <div className="info-box" style={{ marginBottom: "14px" }}>
+          <strong>Live options check:</strong> {optionExpiryCheck.error
+            ? `Unavailable (${optionExpiryCheck.error})`
+            : hasLiveOptionExpiries
+              ? `${optionExpiryCheck.optionCount} listed expiries returned for ${optionExpiryCheck.symbol}.`
+              : `No listed expiries returned for ${optionExpiryCheck.symbol}.`}
+          {optionExpiryCheck.checkedAt ? ` Checked ${optionExpiryCheck.checkedAt}.` : ""}
+        </div>
 
         <div className="card-section" style={{ marginBottom: "14px" }}>
           <div className="info-box" style={{ marginBottom: "12px" }}>
@@ -1023,7 +1161,7 @@ export default function ShellRD() {
             </label>
           </div>
           <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030", marginBottom: "8px" }}>
-            Think of this as 3 choices for each current call: move expiry later, move strike up, or move strike down.
+            Each covered call gets one staggered recommendation spread across 30-180 DTE, the current spot floor, and the live options chain.
           </div>
           <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030", marginBottom: "8px" }}>
             {feeEstimate.sampleCount > 0
@@ -1035,15 +1173,32 @@ export default function ShellRD() {
               Safer ranking score = extra premium - call-away risk penalty (€{ASSIGNMENT_PENALTY_PER_CONTRACT.toFixed(0)} per contract).
             </div>
           ) : null}
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030", marginBottom: "8px" }}>
+            Positive-net-premium filter: only rolls with STO premium greater than BTC cost are recommended; otherwise the leg is held.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: "8px", marginBottom: "10px" }}>
+            <div className="card-section" style={{ padding: "10px" }}>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Grand total BTC cost</div>
+              <div className="mono" style={{ fontSize: "18px", color: "#8b6914" }}>{EUR(grandTotalBtcCost)}</div>
+            </div>
+            <div className="card-section" style={{ padding: "10px" }}>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Grand total STO premium</div>
+              <div className="mono" style={{ fontSize: "18px", color: "#8b6914" }}>{EUR(grandTotalStoPremium)}</div>
+            </div>
+            <div className="card-section" style={{ padding: "10px" }}>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Grand total net premium (recommended only)</div>
+              <div className="mono" style={{ fontSize: "18px", color: "#8b6914" }}>{EUR(grandTotalNetPremium)}</div>
+            </div>
+          </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif", fontSize: "12px" }}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left", padding: "8px" }}>Current call</th>
                 <th style={{ textAlign: "left", padding: "8px" }}>Contracts</th>
                 <th style={{ textAlign: "left", padding: "8px" }}>Cost to close now</th>
-                <th style={{ textAlign: "left", padding: "8px" }}>Move expiry later</th>
-                <th style={{ textAlign: "left", padding: "8px" }}>Move strike up (more upside)</th>
-                <th style={{ textAlign: "left", padding: "8px" }}>Move strike down (more income)</th>
+                <th style={{ textAlign: "left", padding: "8px" }}>Extra premium now (STO)</th>
+                <th style={{ textAlign: "left", padding: "8px" }}>Net Premium</th>
+                <th style={{ textAlign: "left", padding: "8px" }}>Recommendation</th>
               </tr>
             </thead>
             <tbody>
@@ -1054,9 +1209,13 @@ export default function ShellRD() {
                   </td>
                   <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.leg.contracts}</td>
                   <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{EUR(r.buybackPerContract * r.leg.contracts)}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{renderRollChoice(r.out, r.leg.contracts, "Later expiry")}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{renderRollChoice(r.up, r.leg.contracts, "Higher strike")}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{renderRollChoice(r.down, r.leg.contracts, "Lower strike")}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>
+                    {r.recommendation?.isHold ? "-" : EUR(r.recommendation.grossCreditPerContract * r.leg.contracts)}
+                  </td>
+                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>
+                    {r.recommendation?.isHold ? "-" : EUR(r.recommendation.netCreditPerContract * r.leg.contracts)}
+                  </td>
+                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{renderRollRecommendation(r.recommendation, r.leg.contracts)}</td>
                 </tr>
               )) : (
                 <tr>

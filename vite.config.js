@@ -8,6 +8,7 @@ import react from "@vitejs/plugin-react";
 const YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search";
 const YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote";
 const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
+const YAHOO_OPTIONS_URL = "https://query2.finance.yahoo.com/v7/finance/options";
 const STOOQ_QUOTE_URL = "https://stooq.com/q/l/";
 const STOOQ_HISTORY_URL = "https://stooq.com/q/d/l/";
 
@@ -259,6 +260,49 @@ function epochAtDayEndUTC(date) {
   return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59) / 1000);
 }
 
+const yahooOptionsSession = {
+  cookie: "",
+  crumb: "",
+  loadedAt: 0,
+};
+
+async function getYahooOptionsSession() {
+  const now = Date.now();
+  if (yahooOptionsSession.cookie && yahooOptionsSession.crumb && now - yahooOptionsSession.loadedAt < 6 * 60 * 60 * 1000) {
+    return yahooOptionsSession;
+  }
+
+  const bootstrapRes = await fetch("https://fc.yahoo.com", {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+    },
+  });
+  const bootstrapCookie = String(bootstrapRes.headers.get("set-cookie") || "").split(";")[0].trim();
+  if (!bootstrapCookie) {
+    throw new Error("Yahoo options cookie unavailable");
+  }
+
+  const crumbRes = await fetch("https://query1.finance.yahoo.com/v1/test/getcrumb", {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      Cookie: bootstrapCookie,
+    },
+  });
+  if (!crumbRes.ok) {
+    throw new Error("Yahoo crumb unavailable");
+  }
+
+  const crumb = String(await crumbRes.text()).trim();
+  if (!crumb) {
+    throw new Error("Yahoo crumb unavailable");
+  }
+
+  yahooOptionsSession.cookie = bootstrapCookie;
+  yahooOptionsSession.crumb = crumb;
+  yahooOptionsSession.loadedAt = now;
+  return yahooOptionsSession;
+}
+
 async function fetchYahooSearch(term) {
   const endpoint = `${YAHOO_SEARCH_URL}?q=${encodeURIComponent(term)}&quotesCount=12&newsCount=0`;
   const response = await fetch(endpoint);
@@ -354,6 +398,41 @@ async function fetchYahooHistoricalQuote(symbol, date) {
   }
 
   throw new Error("Historical quote unavailable");
+}
+
+async function fetchYahooOptionExpiries(symbol) {
+  const session = await getYahooOptionsSession();
+  const candidates = quoteCandidates(symbol);
+
+  for (const candidate of candidates) {
+    const endpoint = `${YAHOO_OPTIONS_URL}/${encodeURIComponent(candidate)}?crumb=${encodeURIComponent(session.crumb)}`;
+    const response = await fetch(endpoint, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json",
+        Cookie: session.cookie,
+      },
+    });
+    if (!response.ok) continue;
+
+    const payload = await response.json();
+    const result = payload?.optionChain?.result?.[0];
+    const expirationDates = Array.isArray(result?.expirationDates) ? result.expirationDates : [];
+    if (!result) continue;
+
+    return {
+      requestedSymbol: normalizeTickerInput(symbol),
+      symbol: String(result?.underlyingSymbol || candidate).toUpperCase(),
+      availableExpiries: expirationDates
+        .filter((value) => Number.isFinite(Number(value)))
+        .map((value) => isoDayUTC(new Date(Number(value) * 1000))),
+      optionCount: expirationDates.length,
+      source: "yahoo-options",
+      checkedAt: isoDayUTC(new Date()),
+    };
+  }
+
+  throw new Error("Options availability unavailable");
 }
 
 async function fetchStooqQuote(symbol) {
@@ -620,6 +699,30 @@ function mockApiPlugin(runtimeEnv) {
             sendJson(res, 200, quote);
           } catch (error) {
             sendJson(res, 502, { error: error?.message || "Quote unavailable" });
+          }
+          return;
+        }
+
+        if (url.pathname === "/api/options/expiries") {
+          const symbol = normalizeTickerInput(url.searchParams.get("symbol") || "");
+          if (!symbol) {
+            sendJson(res, 400, { error: "Missing ticker" });
+            return;
+          }
+
+          try {
+            const payload = await fetchYahooOptionExpiries(symbol);
+            sendJson(res, 200, payload);
+          } catch (error) {
+            sendJson(res, 200, {
+              requestedSymbol: symbol,
+              symbol,
+              availableExpiries: [],
+              optionCount: 0,
+              source: "yahoo-options",
+              checkedAt: isoDayUTC(new Date()),
+              error: error?.message || "Options availability unavailable",
+            });
           }
           return;
         }
