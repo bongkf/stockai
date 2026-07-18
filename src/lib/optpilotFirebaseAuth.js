@@ -30,38 +30,31 @@ function envFlag(name, fallback = false) {
 }
 
 function buildClientConfig() {
-  const projectId = env("FIREBASE_PROJECT_ID");
-  const authDomain = env("FIREBASE_AUTH_DOMAIN", projectId ? `${projectId}.firebaseapp.com` : "");
-  const storageBucket = env("FIREBASE_STORAGE_BUCKET", projectId ? `${projectId}.appspot.com` : "");
+  // This fallback is for deployments that provide Firebase's public Web SDK
+  // configuration at build time. Server-side FIREBASE_* values must not be
+  // read from the browser bundle.
+  const projectId = env("VITE_FIREBASE_PROJECT_ID");
+  const authDomain = env("VITE_FIREBASE_AUTH_DOMAIN", projectId ? `${projectId}.firebaseapp.com` : "");
+  const storageBucket = env("VITE_FIREBASE_STORAGE_BUCKET", projectId ? `${projectId}.appspot.com` : "");
 
   const missing = [];
-  if (!env("FIREBASE_WEB_API_KEY")) missing.push("FIREBASE_WEB_API_KEY");
-  if (!projectId) missing.push("FIREBASE_PROJECT_ID");
-  if (!authDomain) missing.push("FIREBASE_AUTH_DOMAIN");
+  if (!env("VITE_FIREBASE_WEB_API_KEY")) missing.push("VITE_FIREBASE_WEB_API_KEY");
+  if (!projectId) missing.push("VITE_FIREBASE_PROJECT_ID");
+  if (!authDomain) missing.push("VITE_FIREBASE_AUTH_DOMAIN");
 
   return {
-    enabled: envFlag("USE_FIREBASE_AUTH", false),
+    enabled: envFlag("VITE_USE_FIREBASE_AUTH", false),
     configured: missing.length === 0,
     missing,
     firebase: {
-      apiKey: env("FIREBASE_WEB_API_KEY"),
+      apiKey: env("VITE_FIREBASE_WEB_API_KEY"),
       authDomain,
       projectId,
-      appId: env("FIREBASE_APP_ID"),
+      appId: env("VITE_FIREBASE_APP_ID"),
       storageBucket,
-      messagingSenderId: env("FIREBASE_MESSAGING_SENDER_ID"),
-      authEmulatorHost: env("FIREBASE_AUTH_EMULATOR_HOST"),
+      messagingSenderId: env("VITE_FIREBASE_MESSAGING_SENDER_ID"),
+      authEmulatorHost: env("VITE_FIREBASE_AUTH_EMULATOR_HOST"),
     },
-  };
-}
-
-export function getOptpilotTestUserConfig(userKey) {
-  const key = String(userKey || "A").toUpperCase();
-  return {
-    key,
-    uid: env(`OPTPILOT_E2E_FIREBASE_USER_${key}_UID`),
-    email: env(`OPTPILOT_E2E_FIREBASE_USER_${key}_EMAIL`),
-    password: env(`OPTPILOT_E2E_FIREBASE_USER_${key}_PASSWORD`),
   };
 }
 
@@ -158,10 +151,9 @@ export async function getIdToken(forceRefresh = false) {
 export async function buildOptpilotAuthHeaders(input) {
   const headers = {};
   const options = typeof input === "object" && input !== null ? input : { userKey: input };
-  const user = getOptpilotTestUserConfig(options.userKey);
   const explicitUid = String(options.uid || "").trim();
   const currentUser = await getCurrentUser().catch(() => null);
-  const uid = explicitUid || currentUser?.uid || user.uid;
+  const uid = explicitUid || currentUser?.uid;
 
   if (uid) {
     headers["X-OptPilot-UID"] = uid;

@@ -536,12 +536,9 @@ async function fetchStooqHistoricalQuote(symbol, date) {
   throw new Error("Historical quote unavailable");
 }
 
-function mockApiPlugin(runtimeEnv) {
-  return {
-    name: "market-data-api",
-    configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
-        const url = new URL(req.url || "/", "http://localhost");
+function installApiMiddleware(server, runtimeEnv) {
+  server.middlewares.use(async (req, res, next) => {
+    const url = new URL(req.url || "/", "http://localhost");
 
         if (url.pathname === "/api/firebase/config") {
           const adminStatus = await ensureFirebaseAdmin(runtimeEnv);
@@ -729,7 +726,17 @@ function mockApiPlugin(runtimeEnv) {
 
         next();
       });
-    }
+}
+
+function marketDataApiPlugin(runtimeEnv) {
+  return {
+    name: "market-data-api",
+    configureServer(server) {
+      installApiMiddleware(server, runtimeEnv);
+    },
+    configurePreviewServer(server) {
+      installApiMiddleware(server, runtimeEnv);
+    },
   };
 }
 
@@ -737,7 +744,10 @@ export default defineConfig(({ mode }) => {
   const runtimeEnv = loadEnv(mode, process.cwd(), "");
 
   return {
-    envPrefix: ["VITE_", "FIREBASE_", "USE_FIREBASE_", "OPTPILOT_"],
-    plugins: [react(), mockApiPlugin(runtimeEnv)]
+    // Only explicitly public values may be embedded in the browser bundle.
+    // Firebase Admin credentials and OptPilot test credentials must remain
+    // server/CI-only and must never be exposed through import.meta.env.
+    envPrefix: "VITE_",
+    plugins: [react(), marketDataApiPlugin(runtimeEnv)]
   };
 });

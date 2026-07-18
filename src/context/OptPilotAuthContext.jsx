@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   getFirebaseAuthError,
   getOptpilotFirebaseRuntimeState,
-  getOptpilotTestUserConfig,
   initializeOptpilotFirebaseAuth,
   onUserChanged,
   signInWithGoogle,
@@ -53,9 +52,8 @@ export function OptPilotAuthProvider({ children }) {
 
   async function loginWithSelectedUser(customKey, credentials) {
     const key = String(customKey || selectedUserKey || "A").toUpperCase();
-    const fallback = getOptpilotTestUserConfig(key);
-    const email = String(credentials?.email || fallback.email || "").trim().toLowerCase();
-    const password = String(credentials?.password || fallback.password || "");
+    const email = String(credentials?.email || "").trim().toLowerCase();
+    const password = String(credentials?.password || "");
 
     setBusy(true);
     setAuthError("");

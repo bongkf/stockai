@@ -1,8 +1,8 @@
-import { buildOptpilotAuthHeaders, getCurrentUser, getOptpilotTestUserConfig } from "./optpilotFirebaseAuth.js";
+import { buildOptpilotAuthHeaders, getCurrentUser } from "./optpilotFirebaseAuth.js";
 
 export function resolveOptpilotUserId(userKey) {
   const key = String(userKey || "A").toUpperCase();
-  return getOptpilotTestUserConfig(key).uid || key;
+  return key;
 }
 
 function pathFromTemplate(template, userId) {
@@ -12,19 +12,13 @@ function pathFromTemplate(template, userId) {
 export function resolveOptpilotCollectionPath(userKey) {
   const key = String(userKey || "A").toUpperCase();
   const userId = resolveOptpilotUserId(key);
-  const explicit = import.meta.env[`OPTPILOT_TRADES_COLLECTION_PATH_${key}`];
-  if (explicit) return explicit;
-  const template = import.meta.env.OPTPILOT_TRADES_COLLECTION_TEMPLATE || "Optpilot/{user}/Portfolio.Trades";
-  return pathFromTemplate(template, userId);
+  return pathFromTemplate("Optpilot/{user}/Portfolio.Trades", userId);
 }
 
 export function resolveOptpilotDocPath(userKey) {
   const key = String(userKey || "A").toUpperCase();
   const userId = resolveOptpilotUserId(key);
-  const explicit = import.meta.env[`OPTPILOT_TRADES_DOC_PATH_${key}`];
-  if (explicit) return explicit;
-  const template = import.meta.env.OPTPILOT_TRADES_DOC_TEMPLATE || "Optpilot/{user}/trades.json";
-  return pathFromTemplate(template, userId);
+  return pathFromTemplate("Optpilot/{user}/trades.json", userId);
 }
 
 function normalizeTradeRows(payload) {

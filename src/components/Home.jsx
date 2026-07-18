@@ -36,6 +36,7 @@ export default function Home() {
           <Link to="/montecarlo" className="card-btn">Monte Carlo Simulator</Link>
           <Link to="/shellrd" className="card-btn">RD Covered Calls</Link>
           <Link to="/optpilot" className="card-btn">OptPilot Weekly Options Dashboard</Link>
+          <Link to="/sp500-scorecard" className="card-btn">S&amp;P 500 Long-DTE Scorecard</Link>
         </div>
 
         <section className="home-note">
