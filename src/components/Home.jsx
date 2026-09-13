@@ -37,6 +37,7 @@ export default function Home() {
           <Link to="/shellrd" className="card-btn">RD Covered Calls</Link>
           <Link to="/optpilot" className="card-btn">OptPilot Weekly Options Dashboard</Link>
           <Link to="/sp500-scorecard" className="card-btn">S&amp;P 500 Long-DTE Scorecard</Link>
+          <Link to="/shell-covered-call-ranking" className="card-btn">Shell Covered Call Ranking</Link>
         </div>
 
         <section className="home-note">

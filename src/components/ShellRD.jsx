@@ -935,17 +935,17 @@ export default function ShellRD() {
           {isHold ? "Hold current call" : `${choice.actionLabel}: move to ${expiryLabelFromIso(choice.expiry)} at €${choice.strike.toFixed(2)}`}
         </div>
         {isHold ? (
-          <div style={{ color: "#6b5030" }}>No staggered roll inside the 30-180 DTE window meets the spot floor. Keep the current call.</div>
+          <div style={{ color: "var(--muted)" }}>No staggered roll inside the 30-180 DTE window meets the spot floor. Keep the current call.</div>
         ) : (
           <>
             <div>
               Extra premium now (after est. fees): {EUR(totalCredit)}
               {useRiskAdjusted ? ` (risk-adjusted: ${EUR(totalAdjusted)})` : ""}
             </div>
-            <div style={{ color: "#6b5030" }}>
+            <div style={{ color: "var(--muted)" }}>
               Estimated roll fees: {feeEstimate.sampleCount > 0 ? EUR((choice.estimatedRollFeePerContract || 0) * contracts) : "Unavailable (no fee samples found)"}
             </div>
-            <div style={{ color: "#6b5030" }}>
+            <div style={{ color: "var(--muted)" }}>
               Call-away chance: {(choice.prob * 100).toFixed(1)}% ({assignmentRiskLabel(choice.prob)})
             </div>
           </>
@@ -962,20 +962,20 @@ export default function ShellRD() {
             <div className="serif" style={{ fontSize: "22px", letterSpacing: "-0.01em" }}>
               Shell RD Covered Call Strategy
             </div>
-            <div className="sans" style={{ fontSize: "12px", color: "#a89060", marginTop: "4px" }}>
+            <div className="sans" style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
               Spot €{spot} · {shares} Shares · {effectiveContracts} Contract Ladder
             </div>
             {sourceInfo ? (
-              <div className="sans" style={{ fontSize: "11px", color: "#bfa97f", marginTop: "6px" }}>
+              <div className="sans" style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "6px" }}>
                 {loading ? "Refreshing from portfolio.trades..." : sourceInfo}
               </div>
             ) : null}
           </div>
           <div style={{ textAlign: "right" }}>
-            <div className="mono" style={{ fontSize: "10px", color: "#6b5030", marginBottom: "4px" }}>
+            <div className="mono" style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "4px" }}>
               TOTAL PROJECTED PREMIUM
             </div>
-            <div className="mono" style={{ fontSize: "26px", fontWeight: "500", color: "#fbbf24" }}>{EUR(totalPremium)}</div>
+            <div className="mono" style={{ fontSize: "26px", fontWeight: "500", color: "var(--accent)" }}>{EUR(totalPremium)}</div>
           </div>
         </div>
       </div>
@@ -1015,16 +1015,16 @@ export default function ShellRD() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: "8px", marginBottom: "10px" }}>
             <div className="card-section" style={{ padding: "10px" }}>
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Cash now (all calls)</div>
-              <div className="mono" style={{ fontSize: "20px", color: "#8b6914" }}>{EUR(totalPremium)}</div>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)" }}>Cash now (all calls)</div>
+              <div className="mono" style={{ fontSize: "20px", color: "var(--accent)" }}>{EUR(totalPremium)}</div>
             </div>
             <div className="card-section" style={{ padding: "10px" }}>
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Yield if repeated for 1 year</div>
-              <div className="mono" style={{ fontSize: "20px", color: "#8b6914" }}>{avgAnnualizedYield.toFixed(1)}%</div>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)" }}>Yield if repeated for 1 year</div>
+              <div className="mono" style={{ fontSize: "20px", color: "var(--accent)" }}>{avgAnnualizedYield.toFixed(1)}%</div>
             </div>
             <div className="card-section" style={{ padding: "10px" }}>
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Call-away chance (weighted)</div>
-              <div className="mono" style={{ fontSize: "20px", color: "#8b6914" }}>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)" }}>Call-away chance (weighted)</div>
+              <div className="mono" style={{ fontSize: "20px", color: "var(--accent)" }}>
                 {(weightedAssignmentProb * 100).toFixed(1)}% ({assignmentRiskLabel(weightedAssignmentProb)})
               </div>
             </div>
@@ -1092,13 +1092,13 @@ export default function ShellRD() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="row-hover">
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.label}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.contractLabel}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>€{r.strike.toFixed(2)}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.contracts}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{EUR(r.premium)}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.annualizedYield.toFixed(1)}%</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.label}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.contractLabel}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>€{r.strike.toFixed(2)}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.contracts}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{EUR(r.premium)}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.annualizedYield.toFixed(1)}%</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>
                     {(r.prob * 100).toFixed(1)}% ({assignmentRiskLabel(r.prob)})
                   </td>
                 </tr>
@@ -1112,7 +1112,7 @@ export default function ShellRD() {
             <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "13px", fontWeight: 700, marginBottom: "6px" }}>
               Fallback scenario preview (read-only)
             </div>
-            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030", marginBottom: "8px" }}>
+            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)", marginBottom: "8px" }}>
               This table does not replace your live positions. It is only for comparing the selected fallback ladder against current legs.
             </div>
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif", fontSize: "12px" }}>
@@ -1130,13 +1130,13 @@ export default function ShellRD() {
               <tbody>
                 {previewRows.map((r) => (
                   <tr key={r.id} className="row-hover">
-                    <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.label}</td>
-                    <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.contractLabel}</td>
-                    <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>€{r.strike.toFixed(2)}</td>
-                    <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.contracts}</td>
-                    <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{EUR(r.premium)}</td>
-                    <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.annualizedYield.toFixed(1)}%</td>
-                    <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>
+                    <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.label}</td>
+                    <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.contractLabel}</td>
+                    <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>€{r.strike.toFixed(2)}</td>
+                    <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.contracts}</td>
+                    <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{EUR(r.premium)}</td>
+                    <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.annualizedYield.toFixed(1)}%</td>
+                    <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>
                       {(r.prob * 100).toFixed(1)}% ({assignmentRiskLabel(r.prob)})
                     </td>
                   </tr>
@@ -1160,34 +1160,34 @@ export default function ShellRD() {
               Use safer ranking (risk-adjusted)
             </label>
           </div>
-          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030", marginBottom: "8px" }}>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)", marginBottom: "8px" }}>
             Each covered call gets one staggered recommendation spread across 30-180 DTE, the current spot floor, and the live options chain.
           </div>
-          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030", marginBottom: "8px" }}>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)", marginBottom: "8px" }}>
             {feeEstimate.sampleCount > 0
               ? `Fee assumption from Portfolio.Trades: ${EUR(feeEstimate.perContract)} per contract per order from ${feeEstimate.sampleCount} fee samples. Roll estimates subtract BTC + STO fees.`
               : "Fee assumption from Portfolio.Trades is unavailable (no fee samples found), so roll fee deduction is currently not applied."}
           </div>
           {useRiskAdjusted ? (
-            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030", marginBottom: "8px" }}>
+            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)", marginBottom: "8px" }}>
               Safer ranking score = extra premium - call-away risk penalty (€{ASSIGNMENT_PENALTY_PER_CONTRACT.toFixed(0)} per contract).
             </div>
           ) : null}
-          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030", marginBottom: "8px" }}>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)", marginBottom: "8px" }}>
             Positive-net-premium filter: only rolls with STO premium greater than BTC cost are recommended; otherwise the leg is held.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: "8px", marginBottom: "10px" }}>
             <div className="card-section" style={{ padding: "10px" }}>
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Grand total BTC cost</div>
-              <div className="mono" style={{ fontSize: "18px", color: "#8b6914" }}>{EUR(grandTotalBtcCost)}</div>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)" }}>Grand total BTC cost</div>
+              <div className="mono" style={{ fontSize: "18px", color: "var(--accent)" }}>{EUR(grandTotalBtcCost)}</div>
             </div>
             <div className="card-section" style={{ padding: "10px" }}>
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Grand total STO premium</div>
-              <div className="mono" style={{ fontSize: "18px", color: "#8b6914" }}>{EUR(grandTotalStoPremium)}</div>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)" }}>Grand total STO premium</div>
+              <div className="mono" style={{ fontSize: "18px", color: "var(--accent)" }}>{EUR(grandTotalStoPremium)}</div>
             </div>
             <div className="card-section" style={{ padding: "10px" }}>
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "#6b5030" }}>Grand total net premium (recommended only)</div>
-              <div className="mono" style={{ fontSize: "18px", color: "#8b6914" }}>{EUR(grandTotalNetPremium)}</div>
+              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "11px", color: "var(--muted)" }}>Grand total net premium (recommended only)</div>
+              <div className="mono" style={{ fontSize: "18px", color: "var(--accent)" }}>{EUR(grandTotalNetPremium)}</div>
             </div>
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif", fontSize: "12px" }}>
@@ -1204,22 +1204,22 @@ export default function ShellRD() {
             <tbody>
               {rollRecommendations.length ? rollRecommendations.map((r) => (
                 <tr key={r.key} className="row-hover">
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>
                     {r.leg.ticker} {expiryLabelFromIso(r.leg.expiry)} €{r.leg.strike.toFixed(2)} call
                   </td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{r.leg.contracts}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{EUR(r.buybackPerContract * r.leg.contracts)}</td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{r.leg.contracts}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{EUR(r.buybackPerContract * r.leg.contracts)}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>
                     {r.recommendation?.isHold ? "-" : EUR(r.recommendation.grossCreditPerContract * r.leg.contracts)}
                   </td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>
                     {r.recommendation?.isHold ? "-" : EUR(r.recommendation.netCreditPerContract * r.leg.contracts)}
                   </td>
-                  <td style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>{renderRollRecommendation(r.recommendation, r.leg.contracts)}</td>
+                  <td style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>{renderRollRecommendation(r.recommendation, r.leg.contracts)}</td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={6} style={{ padding: "8px", borderTop: "1px solid #e8dcc8" }}>
+                  <td colSpan={6} style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>
                     No open call positions found yet, so roll ideas are not available.
                   </td>
                 </tr>
